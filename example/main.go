@@ -8,6 +8,13 @@ import (
 	"github.com/mdsung/vitaldb_processor/vital"
 )
 
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Println("Usage: go run main.go <vital_file_path>")
@@ -53,19 +60,36 @@ func main() {
 		fmt.Printf("... and %d more tracks\n", len(vf.Trks)-10)
 	}
 
-	// 첫 번째 트랙의 샘플 데이터 출력
+	// 첫 번째 트랙의 샘플 데이터 출력 (타입 안전성을 고려한 접근)
 	if len(vf.Order) > 0 {
 		firstTrackName := vf.Order[0]
 		if track, exists := vf.Trks[firstTrackName]; exists && len(track.Recs) > 0 {
 			fmt.Printf("\n=== Sample Data from '%s' ===\n", firstTrackName)
 			for i, rec := range track.Recs {
-				if i >= 5 { // 처음 5개만 출력
+				if i >= 3 { // 처음 3개만 출력 (비교를 위해)
 					break
 				}
-				fmt.Printf("Time: %f, Value: %v\n", rec.Dt, rec.Val)
-			}
-			if len(track.Recs) > 5 {
-				fmt.Printf("... and %d more records\n", len(track.Recs)-5)
+
+				fmt.Printf("\n--- Record %d ---\n", i+1)
+
+				// 기존 방식 (raw value)
+				fmt.Printf("기존 방식 - Raw Value: %v\n", rec.Val)
+				fmt.Printf("기존 방식 - Type: %T\n", rec.Val)
+
+				// 새로운 타입 안전성 방식
+				if numVal, ok := rec.GetNumericValue(); ok {
+					fmt.Printf("새 방식 - Numeric Value: %.6f\n", numVal)
+				} else if strVal, ok := rec.AsString(); ok {
+					fmt.Printf("새 방식 - String Value: %s\n", strVal)
+				} else if arr32, ok := rec.AsFloat32Array(); ok {
+					fmt.Printf("새 방식 - Float32 Array (%d samples): 처음 5개 = %v\n", len(arr32), arr32[:min(5, len(arr32))])
+					fmt.Printf("기존 방식과 비교 - 첫 번째 값: %.6f vs %.6f\n", arr32[0], rec.Val.([]float32)[0])
+				} else if arr64, ok := rec.AsFloat64Array(); ok {
+					fmt.Printf("새 방식 - Float64 Array (%d samples): 처음 5개 = %v\n", len(arr64), arr64[:min(5, len(arr64))])
+					fmt.Printf("기존 방식과 비교 - 첫 번째 값: %.6f vs %.6f\n", arr64[0], rec.Val.([]float64)[0])
+				} else {
+					fmt.Printf("새 방식 - Unknown type: %v\n", rec.Val)
+				}
 			}
 		}
 	}

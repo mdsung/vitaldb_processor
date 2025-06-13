@@ -1,5 +1,11 @@
 package vital
 
+// Value represents the possible data types that can be stored in a Rec
+type Value interface {
+	~float32 | ~float64 | ~int8 | ~uint8 | ~int16 | ~uint16 | ~int32 | ~uint32 | ~string |
+		~[]float32 | ~[]float64
+}
+
 // Device represents a medical device in the VitalDB file
 type Device struct {
 	Name     string
@@ -27,7 +33,7 @@ type Track struct {
 // Rec represents a single data record within a track
 type Rec struct {
 	Dt  float64
-	Val interface{}
+	Val any // 더 명확한 표기를 위해 any 사용 (Go 1.18+에서 interface{}의 별칭)
 }
 
 // VitalFile represents the complete structure of a VitalDB file

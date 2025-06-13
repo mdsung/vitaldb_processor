@@ -96,7 +96,7 @@ func parseWaveData(pkt []byte, pos int, dt float64, trkid uint16, track *Track, 
 	}
 
 	// fmt에 따라 적절한 타입의 샘플 배열 생성
-	var samples interface{}
+	var samples any
 
 	switch track.Fmt {
 	case 1: // float32 - 원본 타입 유지
@@ -168,7 +168,7 @@ func parseWaveData(pkt []byte, pos int, dt float64, trkid uint16, track *Track, 
 // parseNumericData parses NUMERIC type data from REC packet
 func parseNumericData(pkt []byte, pos int, dt float64, track *Track) {
 	// 포맷에 따른 데이터 크기 및 타입 결정 - 원본 타입 유지
-	var val interface{}
+	var val any
 	switch track.Fmt {
 	case 1: // float32 - 원본 타입 유지
 		if pos+4 > len(pkt) {
