@@ -73,43 +73,43 @@ func TestDataParsing(t *testing.T) {
 
 ---
 
-## 🚀 CLI 기능 개발 (우선순위: 중간)
+## ✅ CLI 기능 개발 (완료됨!)
 
 ### Python 활용을 위한 명령줄 옵션 구현
 
 #### 1. Flag 패키지 도입
 
-- [ ] 현재 `os.Args[1]` 방식을 `flag` 패키지로 교체
+- [x] 현재 `os.Args[1]` 방식을 `flag` 패키지로 교체
 - [ ] `cobra` CLI 라이브러리 검토 (더 풍부한 기능)
 
 #### 2. 출력 형식 옵션
 
-- [ ] `--format json` : JSON 출력
+- [x] `--format json` : JSON 출력
 - [ ] `--format csv` : CSV 출력
-- [ ] `--summary` : 요약 정보만 출력
+- [x] `--summary` : 요약 정보만 출력
 
 #### 3. 트랙 필터링 옵션
 
-- [ ] `--tracks "ECG_II,HR,PLETH"` : 특정 트랙만 추출
-- [ ] `--track-type WAVE|NUMERIC|STRING` : 타입별 필터링
+- [x] `--tracks "ECG_II,HR,PLETH"` : 특정 트랙만 추출
+- [x] `--track-type WAVE|NUMERIC|STRING` : 타입별 필터링
 - [ ] `--track-pattern "ECG*"` : 패턴 매칭
 
 #### 4. 시간 범위 옵션
 
-- [ ] `--start-time 0 --end-time 300` : 시간 범위 지정
+- [x] `--start-time 0 --end-time 300` : 시간 범위 지정
 - [ ] `--start 5m --end 10m` : 시간 단위 지원
 
 #### 5. 정보 조회 옵션
 
-- [ ] `--list-tracks` : 트랙 목록만 출력
-- [ ] `--info-only` : 파일 정보만 출력
-- [ ] `--list-devices` : 디바이스 정보 출력
+- [x] `--list-tracks` : 트랙 목록만 출력
+- [x] `--info-only` : 파일 정보만 출력
+- [x] `--list-devices` : 디바이스 정보 출력
 
 #### 6. 출력 제어 옵션
 
-- [ ] `--max-samples 1000` : 샘플 개수 제한
-- [ ] `--quiet` : 에러만 출력
-- [ ] `--verbose` : 상세 출력
+- [x] `--max-samples 1000` : 샘플 개수 제한
+- [x] `--quiet` : 에러만 출력
+- [x] `--verbose` : 상세 출력
 
 #### 7. 파일 출력 옵션
 
@@ -185,24 +185,37 @@ func TestDataParsing(t *testing.T) {
 - [x] CLI 옵션 계획을 README.md에 문서화
 - [x] 기본적인 VitalDB 파일 파싱 기능 구현
 - [x] 타입 안전성을 고려한 데이터 구조 설계
+- [x] **CLI 기능 대폭 개선 (2024.06.13)**
+  - [x] Flag 패키지 도입으로 완전한 CLI 인터페이스 구현
+  - [x] JSON 출력 형식 지원으로 Python 연동 최적화
+  - [x] 트랙 제한 문제 해결 (`-max-tracks 0`으로 모든 트랙 출력)
+  - [x] 디바이스 파싱 문제 해결
+  - [x] 트랙 필터링 기능 (`-tracks`, `-track-type`)
+  - [x] 시간 범위 필터링 (`-start-time`, `-end-time`)
+  - [x] 정보 조회 옵션 (`-list-tracks`, `-info-only`, `-list-devices`)
+  - [x] 출력 제어 옵션 (`-quiet`, `-verbose`, `-summary`, `-max-samples`)
+  - [x] 데모 스크립트 생성 (`example/demo.py`)
+  - [x] README.md 대폭 업데이트 (새로운 기능 및 Python 연동 가이드)
 
 ---
 
 ## 📅 예상 일정
 
-### Phase 1: 테스트 개선 (1-2주)
+### ~~Phase 1: CLI 기능 (완료!)~~
+
+- [x] Flag 패키지 도입 및 기본 옵션 구현
+- [x] JSON 출력 기능 추가
+- [x] 트랙 필터링 및 시간 범위 기능
+
+### Phase 2: 테스트 개선 (1-2주)
 
 - 테스트 코드 분리 및 Mock 데이터 시스템 구축
 - CI/CD 파이프라인 설정
 
-### Phase 2: CLI 기능 (2-3주)
+### Phase 3: 고급 기능 (2-3주)
 
-- Flag 패키지 도입 및 기본 옵션 구현
-- JSON/CSV 출력 기능 추가
-
-### Phase 3: 고급 기능 (3-4주)
-
-- 트랙 필터링 및 시간 범위 기능
+- CSV 출력 기능
+- 패턴 매칭 필터링
 - 성능 최적화
 
 ### Phase 4: 문서화 및 배포 (1-2주)
