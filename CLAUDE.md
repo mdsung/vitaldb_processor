@@ -44,21 +44,29 @@ go test -bench=. ./vital
 
 ### Common CLI Usage
 
+**Sample Data**: Test files are available in `data_sample/` directory (6 .vital files, ~10MB total).
+
 ```bash
+# CSV output (default, pandas-compatible)
+./vitaldb_processor ../data_sample/MICUA01_240724_180000.vital > output.csv
+
+# Parquet output (high-performance, compressed)
+./vitaldb_processor -format parquet ../data_sample/MICUA01_240724_180000.vital > output.parquet
+
 # Basic file info
-./vitaldb_processor -info-only -quiet data.vital
+./vitaldb_processor -info-only -quiet ../data_sample/MICUA01_240724_180000.vital
 
 # JSON output (for Python integration)
-./vitaldb_processor -format json -max-tracks 0 data.vital
+./vitaldb_processor -format json -max-tracks 0 ../data_sample/MICUA01_240724_180000.vital
 
 # Filter specific tracks
-./vitaldb_processor -tracks "ECG_II,HR,PLETH" data.vital
+./vitaldb_processor -tracks "ECG_II,HR,PLETH" ../data_sample/MICUA01_240724_180000.vital
 
 # Filter by track type
-./vitaldb_processor -track-type WAVE data.vital
+./vitaldb_processor -track-type WAVE ../data_sample/MICUA01_240724_180000.vital
 
 # Time range extraction
-./vitaldb_processor -start-time 0 -end-time 300 data.vital
+./vitaldb_processor -start-time 0 -end-time 300 ../data_sample/MICUA01_240724_180000.vital
 ```
 
 ## Architecture
@@ -203,9 +211,24 @@ vf = vitaldb.VitalFile('data.vital')
 
 Some VitalDB files have incomplete packets at EOF. The library matches Python VitalDB by ignoring these (`vital.go:91-92`), which fixed compatibility with real-world files.
 
-### File Path Dependencies
+### Test Data Location
 
-Tests currently hardcode paths like `../../data/sample_vitalfiles/`. This is a known issue tracked in TODO.md - tests should use embedded testdata instead.
+**Sample Files**: Real VitalDB test files are in `data_sample/` directory:
+- 6 .vital files (~400KB to 3.1MB each)
+- Total size: ~10MB
+- Files: `MICUA01_240724_180000.vital`, `MICUA01_240724_180622.vital`, etc.
+
+**Usage in Tests**:
+```bash
+# Run integration tests with sample data
+go test -tags=integration ./vital -v
+
+# Test CLI with sample data
+cd example
+./vitaldb_processor ../data_sample/MICUA01_240724_180000.vital
+```
+
+**Note**: Integration tests (`integration_test.go`) may reference paths like `../../data_sample/`. Use these real files for testing instead of mocks when possible.
 
 ### Type Safety vs Flexibility
 
