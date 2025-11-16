@@ -1,18 +1,22 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
 	"os"
+	"runtime/pprof"
 	"strings"
 
 	"github.com/mdsung/vitaldb_processor/vital"
+	"github.com/vmihailenco/msgpack/v5"
 )
 
 type Config struct {
-	Format      string  // "text" or "json"
+	Format      string  // "text", "json", or "msgpack"
+	Compact     bool    // Compact JSON (no indentation)
 	ListTracks  bool    // 트랙 목록만 출력
 	InfoOnly    bool    // 파일 정보만 출력
 	ListDevices bool    // 디바이스 목록만 출력
@@ -25,6 +29,8 @@ type Config struct {
 	EndTime     float64 // 종료 시간
 	Quiet       bool    // 조용한 모드
 	Verbose     bool    // 상세 모드
+	CPUProfile  string  // CPU 프로파일 출력 파일
+	MemProfile  string  // 메모리 프로파일 출력 파일
 }
 
 type OutputData struct {
@@ -49,19 +55,21 @@ type DeviceInfo struct {
 }
 
 type TrackInfo struct {
-	Name        string       `json:"name"`
-	Type        uint8        `json:"type"`
-	TypeName    string       `json:"type_name"`
-	Unit        string       `json:"unit"`
-	SampleRate  float32      `json:"sample_rate"`
-	Gain        float64      `json:"gain"`
-	Offset      float64      `json:"offset"`
-	MinDisplay  float32      `json:"min_display"`
-	MaxDisplay  float32      `json:"max_display"`
-	Color       uint32       `json:"color"`
-	MonitorType uint8        `json:"monitor_type"`
-	DeviceName  string       `json:"device_name"`
-	Records     []RecordInfo `json:"records,omitempty"`
+	Name         string       `json:"name"`
+	Type         uint8        `json:"type"`
+	TypeName     string       `json:"type_name"`
+	Fmt          uint8        `json:"fmt"`
+	Unit         string       `json:"unit"`
+	SampleRate   float32      `json:"sample_rate"`
+	Gain         float64      `json:"gain"`
+	Offset       float64      `json:"offset"`
+	MinDisplay   float32      `json:"min_display"`
+	MaxDisplay   float32      `json:"max_display"`
+	Color        uint32       `json:"color"`
+	MonitorType  uint8        `json:"monitor_type"`
+	DeviceName   string       `json:"device_name"`
+	RecordsCount int          `json:"records_count"`
+	Records      []RecordInfo `json:"records,omitempty"`
 }
 
 type RecordInfo struct {
@@ -78,6 +86,19 @@ func main() {
 		os.Exit(1)
 	}
 
+	// CPU 프로파일링 시작
+	if config.CPUProfile != "" {
+		f, err := os.Create(config.CPUProfile)
+		if err != nil {
+			log.Fatal("CPU 프로파일 생성 실패:", err)
+		}
+		defer f.Close()
+		if err := pprof.StartCPUProfile(f); err != nil {
+			log.Fatal("CPU 프로파일 시작 실패:", err)
+		}
+		defer pprof.StopCPUProfile()
+	}
+
 	filepath := flag.Args()[0]
 
 	if !config.Quiet {
@@ -91,21 +112,48 @@ func main() {
 
 	output := processVitalFile(vf, config)
 
-	if config.Format == "json" {
-		jsonData, err := json.MarshalIndent(output, "", "  ")
-		if err != nil {
+	// 출력 형식에 따라 처리
+	switch config.Format {
+	case "json":
+		encoder := json.NewEncoder(os.Stdout)
+		if !config.Compact {
+			encoder.SetIndent("", "  ")
+		}
+		if err := encoder.Encode(output); err != nil {
 			log.Fatal(err)
 		}
-		fmt.Println(string(jsonData))
-	} else {
+	case "msgpack":
+		// 버퍼링된 writer 사용 (syscall 오버헤드 감소)
+		writer := bufio.NewWriterSize(os.Stdout, 256*1024) // 256KB 버퍼
+		encoder := msgpack.NewEncoder(writer)
+		if err := encoder.Encode(output); err != nil {
+			log.Fatal(err)
+		}
+		if err := writer.Flush(); err != nil {
+			log.Fatal(err)
+		}
+	default: // "text"
 		printTextOutput(output, config)
+	}
+
+	// 메모리 프로파일링
+	if config.MemProfile != "" {
+		f, err := os.Create(config.MemProfile)
+		if err != nil {
+			log.Fatal("메모리 프로파일 생성 실패:", err)
+		}
+		defer f.Close()
+		if err := pprof.WriteHeapProfile(f); err != nil {
+			log.Fatal("메모리 프로파일 작성 실패:", err)
+		}
 	}
 }
 
 func parseFlags() *Config {
 	config := &Config{}
 
-	flag.StringVar(&config.Format, "format", "text", "출력 형식 (text, json)")
+	flag.StringVar(&config.Format, "format", "text", "출력 형식 (text, json, msgpack)")
+	flag.BoolVar(&config.Compact, "compact", false, "Compact JSON (들여쓰기 없음)")
 	flag.BoolVar(&config.ListTracks, "list-tracks", false, "트랙 목록만 출력")
 	flag.BoolVar(&config.InfoOnly, "info-only", false, "파일 정보만 출력")
 	flag.BoolVar(&config.ListDevices, "list-devices", false, "디바이스 목록만 출력")
@@ -118,6 +166,8 @@ func parseFlags() *Config {
 	flag.Float64Var(&config.EndTime, "end-time", 0, "종료 시간 (0 = 파일 끝까지)")
 	flag.BoolVar(&config.Quiet, "quiet", false, "조용한 모드 (에러만 출력)")
 	flag.BoolVar(&config.Verbose, "verbose", false, "상세 모드")
+	flag.StringVar(&config.CPUProfile, "cpuprofile", "", "CPU 프로파일 출력 파일")
+	flag.StringVar(&config.MemProfile, "memprofile", "", "메모리 프로파일 출력 파일")
 
 	flag.Parse()
 	return config
@@ -211,6 +261,7 @@ func processTracks(vf *vital.VitalFile, config *Config) map[string]TrackInfo {
 			Name:        track.Name,
 			Type:        track.Type,
 			TypeName:    getTypeName(track.Type),
+			Fmt:         track.Fmt,
 			Unit:        track.Unit,
 			SampleRate:  track.SRate,
 			Gain:        track.Gain,
@@ -224,9 +275,15 @@ func processTracks(vf *vital.VitalFile, config *Config) map[string]TrackInfo {
 
 		// 레코드 데이터 (요약 모드가 아닌 경우만)
 		if !config.Summary && !config.ListTracks {
-			records := make([]RecordInfo, 0)
+			// 메모리 프리할당: 최대 필요 용량 사전 확보
+			expectedSize := len(track.Recs)
+			if config.MaxSamples > 0 && config.MaxSamples < expectedSize {
+				expectedSize = config.MaxSamples
+			}
+			records := make([]RecordInfo, 0, expectedSize)
+
 			for i, rec := range track.Recs {
-				if i >= config.MaxSamples {
+				if config.MaxSamples > 0 && i >= config.MaxSamples {
 					break
 				}
 
@@ -244,6 +301,10 @@ func processTracks(vf *vital.VitalFile, config *Config) map[string]TrackInfo {
 				})
 			}
 			trackInfo.Records = records
+			trackInfo.RecordsCount = len(records)
+		} else {
+			// Summary mode: still count total records
+			trackInfo.RecordsCount = len(track.Recs)
 		}
 
 		tracks[name] = trackInfo

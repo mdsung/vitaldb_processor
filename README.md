@@ -2,6 +2,24 @@
 
 VitalDB 파일(.vital)을 읽고 처리하기 위한 Go 라이브러리입니다.
 
+## ⚡ 성능
+
+Python VitalDB 대비 **7.29배 빠른 성능** (MessagePack 사용 시)
+
+| 구현 | 시간 (3.12MB 파일) | Python 대비 | 크기 |
+|------|-------------------|-------------|------|
+| Python VitalDB | 1,123ms | 1.00x (기준) | - |
+| **Go (JSON compact)** | **257ms** | **4.37x** ⚡ | 18.0MB |
+| **Go (MessagePack)** | **154ms** | **7.29x** 🚀 | 12.6MB |
+
+**주요 특징**:
+- ✅ **100% 정확도**: Python VitalDB와 동일한 결과 보장
+- ✅ **7.29배 빠른 처리**: MessagePack 사용 시
+- ✅ **30% 작은 출력**: 효율적인 바이너리 직렬화
+- ✅ **Python 통합 간편**: JSON/MessagePack 양방향 지원
+
+자세한 최적화 내역은 [`notes/optimization_results.md`](notes/optimization_results.md)를 참조하세요.
+
 ## 설치
 
 ```bash
@@ -145,17 +163,34 @@ VitalDB 파일을 읽어서 VitalFile 구조체로 반환합니다.
 
 개선된 Go 바이너리와 함께 Python에서 더 효과적으로 사용할 수 있습니다.
 
-### 1. JSON 출력을 통한 완전한 데이터 분석
+### ⚠️ 중요: Python VitalDB 라이브러리 버퍼 오류 수정
+
+Python VitalDB 라이브러리를 직접 사용할 경우, **반드시** 다음 코드를 추가해야 버퍼 오류가 발생하지 않습니다:
+
+```python
+import vitaldb
+
+# 필수: 버퍼 오류 방지를 위한 포맷 타입 설정
+vitaldb.utils.FMT_TYPE_LEN[7] = ("i", 4)
+vitaldb.utils.FMT_TYPE_LEN[8] = ("I", 4)
+
+# 이제 정상적으로 VitalDB 파일 로드 가능
+vf = vitaldb.VitalFile('data.vital')
+```
+
+**주의**: 이 설정 없이 Python VitalDB를 사용하면 일부 파일에서 "buffer is too small" 오류가 발생할 수 있습니다. Go VitalDB Processor는 이러한 문제가 없습니다.
+
+### 1. 데이터 로드 (JSON / MessagePack)
+
+#### 방법 A: JSON (범용, 디버깅 용이)
 
 ```python
 import subprocess
 import json
-import numpy as np
-import matplotlib.pyplot as plt
 
-def load_vital_data(file_path, **kwargs):
-    """VitalDB 파일을 JSON으로 로드"""
-    cmd = ['./vitaldb_processor', '-format', 'json']
+def load_vital_data_json(file_path, **kwargs):
+    """VitalDB 파일을 JSON으로 로드 (4.37배 빠름)"""
+    cmd = ['./vitaldb_processor', '-format', 'json', '-compact']
 
     # 옵션 추가
     if 'tracks' in kwargs:
@@ -176,6 +211,46 @@ def load_vital_data(file_path, **kwargs):
         raise Exception(f"Error processing file: {result.stderr}")
 
     return json.loads(result.stdout)
+```
+
+#### 방법 B: MessagePack (최고 성능, 7.29배 빠름)
+
+```python
+import subprocess
+import msgpack  # pip install msgpack
+
+def load_vital_data_msgpack(file_path, **kwargs):
+    """VitalDB 파일을 MessagePack으로 로드 (7.29배 빠름, 30% 작은 크기)"""
+    cmd = ['./vitaldb_processor', '-format', 'msgpack']
+
+    # 옵션 추가 (JSON과 동일)
+    if 'tracks' in kwargs:
+        cmd.extend(['-tracks', ','.join(kwargs['tracks'])])
+    if 'track_type' in kwargs:
+        cmd.extend(['-track-type', kwargs['track_type']])
+    if 'start_time' in kwargs:
+        cmd.extend(['-start-time', str(kwargs['start_time'])])
+    if 'end_time' in kwargs:
+        cmd.extend(['-end-time', str(kwargs['end_time'])])
+    if 'max_tracks' in kwargs:
+        cmd.extend(['-max-tracks', str(kwargs['max_tracks'])])
+
+    cmd.append(file_path)
+
+    result = subprocess.run(cmd, capture_output=True)
+    if result.returncode != 0:
+        raise Exception(f"Error processing file: {result.stderr}")
+
+    return msgpack.unpackb(result.stdout)
+
+# 추천: 성능을 위해 MessagePack 사용, 필요시 JSON fallback
+def load_vital_data(file_path, **kwargs):
+    """VitalDB 파일 로드 (MessagePack 우선, JSON fallback)"""
+    try:
+        import msgpack
+        return load_vital_data_msgpack(file_path, **kwargs)
+    except ImportError:
+        return load_vital_data_json(file_path, **kwargs)
 
 # 사용 예시
 # 전체 데이터 로드
@@ -398,7 +473,9 @@ python3 demo.py
 
 ```
 -format string
-    출력 형식 (text, json) (기본값: "text")
+    출력 형식 (text, json, msgpack) (기본값: "text")
+-compact
+    Compact JSON 출력 (들여쓰기 없음, 성능 향상)
 -info-only
     파일 정보만 출력
 -list-devices
@@ -428,7 +505,13 @@ python3 demo.py
 ### 출력 형식 옵션
 
 ```bash
-# JSON 형태로 출력 (Python 연동에 최적화)
+# MessagePack 형태로 출력 (최고 성능, 7.29배 빠름)
+./vitaldb_processor -format msgpack data.vital > output.msgpack
+
+# JSON Compact 형태로 출력 (4.37배 빠름)
+./vitaldb_processor -format json -compact data.vital > output.json
+
+# JSON 형태로 출력 (가독성 우선, Pretty-print)
 ./vitaldb_processor -format json data.vital
 
 # 기본 텍스트 형태로 출력
@@ -495,25 +578,128 @@ python3 demo.py
 ### 사용 예시
 
 ```bash
-# ECG 데이터만 처음 5분간 JSON으로 추출
-./vitaldb_processor -tracks "ECG_II" -start-time 0 -end-time 300 -format json data.vital
+# ECG 데이터만 처음 5분간 MessagePack으로 추출 (최고 성능)
+./vitaldb_processor -tracks "ECG_II" -start-time 0 -end-time 300 -format msgpack data.vital > ecg.msgpack
 
-# 모든 수치형 데이터를 JSON으로 저장
-./vitaldb_processor -track-type NUMERIC -format json data.vital > vitals.json
+# 모든 수치형 데이터를 JSON Compact로 저장
+./vitaldb_processor -track-type NUMERIC -format json -compact data.vital > vitals.json
 
 # 파일 정보 빠르게 확인
 ./vitaldb_processor -info-only -quiet data.vital
 
-# 모든 트랙을 JSON으로 출력 (Python 연동용)
-./vitaldb_processor -format json -max-tracks 0 data.vital
+# 모든 트랙을 MessagePack으로 출력 (Python 연동용, 최고 성능)
+./vitaldb_processor -format msgpack -max-tracks 0 -max-samples 0 data.vital > output.msgpack
+
+# 모든 트랙을 JSON Compact으로 출력 (Python 연동용, 범용)
+./vitaldb_processor -format json -compact -max-tracks 0 -max-samples 0 data.vital > output.json
 ```
 
-## 성능
+## 테스트
 
-이 라이브러리는 Python VitalDB SDK와 비교하여 약 20% 성능 향상을 제공합니다:
+프로젝트는 세 가지 유형의 테스트를 지원합니다:
 
-- Python SDK: 3.487초 (20개 파일, 67.2MB)
-- Go Library: 2.905초 (20개 파일, 67.2MB) - **1.20x 빠름**
+### 테스트 실행 방법
+
+```bash
+# 유닛 테스트만 실행 (빠름, 외부 파일 불필요)
+make test
+# 또는
+go test ./vital
+
+# 통합 테스트 실행 (실제 .vital 파일 필요)
+make test-integration
+# 또는
+go test -tags=integration ./vital
+
+# 모든 테스트 실행
+make test-all
+
+# 벤치마크 실행
+make bench
+
+# 테스트 파일 줄 수 검증
+make verify-linecount
+```
+
+### 테스트 파일 구조
+
+- `vital/unit_test.go` - 유닛 테스트 (Mock 데이터 사용, Task #2에서 구현 예정)
+- `vital/integration_test.go` - 통합 테스트 (`//go:build integration` 태그 필요)
+- `vital/benchmark_test.go` - 성능 벤치마크
+- `vital/helper_test.go` - 공통 테스트 헬퍼 함수
+
+통합 테스트는 `//go:build integration` 빌드 태그를 사용하여 실제 .vital 파일이 있을 때만 실행됩니다.
+
+## 프로젝트 목표 및 설계 원칙
+
+### 설계 원칙
+
+**🎯 Python VitalDB = Golden Standard**
+
+이 프로젝트의 핵심 원칙:
+1. **정확도**: Python VitalDB (버퍼 오류 수정 적용)와 **100% 동일한 결과** 산출
+2. **성능**: Python VitalDB보다 빠른 처리 속도
+3. **호환성**: Python VitalDB가 지원하는 모든 파일 형식 지원
+
+**중요**: Python VitalDB와 결과가 다르다면, 이는 Go 구현의 **버그**입니다. Python VitalDB의 출력이 정답입니다.
+
+### 성능 목표
+
+Go 구현은 다음을 목표로 합니다:
+- ✅ Python VitalDB와 **동일한 데이터** 추출
+- ✅ Python VitalDB보다 **빠른 처리 속도**
+- ✅ Python VitalDB보다 **낮은 메모리 사용**
+
+### 검증 방법
+
+Go 구현의 정확성을 검증하려면:
+
+```bash
+# 1. Python VitalDB로 데이터 추출 (버퍼 오류 수정 적용)
+python3 -c "
+import vitaldb
+vitaldb.utils.FMT_TYPE_LEN[7] = ('i', 4)
+vitaldb.utils.FMT_TYPE_LEN[8] = ('I', 4)
+vf = vitaldb.VitalFile('data.vital')
+# ... 결과 저장
+"
+
+# 2. Go로 동일한 파일 처리
+./vitaldb_processor -format json data.vital > go_output.json
+
+# 3. 결과 비교 - 동일해야 함!
+```
+
+### 사용 사례
+
+**Go VitalDB Processor 권장**:
+- ✅ 프로덕션 시스템 (빠른 처리 속도 필요)
+- ✅ 대용량 배치 처리
+- ✅ 서버 환경에서 Python 설치 불가능한 경우
+- ✅ 컨테이너/도커 환경 (단일 바이너리)
+
+**Python VitalDB 권장**:
+- ✅ 데이터 분석 (Pandas, NumPy 등과 함께 사용)
+- ✅ 프로토타이핑 및 탐색적 분석
+- ✅ Python 생태계 통합이 중요한 경우
+
+**하이브리드 접근** (최적):
+```bash
+# 방법 1: MessagePack 사용 (최고 성능, 7.29배 빠름)
+./vitaldb_processor -format msgpack -max-tracks 0 data.vital > output.msgpack
+python analyze.py output.msgpack  # msgpack.unpackb() 사용
+
+# 방법 2: JSON Compact 사용 (범용, 4.37배 빠름)
+./vitaldb_processor -format json -compact -max-tracks 0 data.vital > output.json
+python analyze.py output.json  # json.loads() 사용
+```
+
+**성능 비교**:
+- Python VitalDB 직접 사용: 1,123ms
+- Go + JSON Compact: 257ms (4.37배 빠름)
+- Go + MessagePack: 154ms (7.29배 빠름) ⚡
+
+자세한 벤치마크 결과는 [`notes/optimization_results.md`](notes/optimization_results.md)를 참조하세요.
 
 ## 라이센스
 
