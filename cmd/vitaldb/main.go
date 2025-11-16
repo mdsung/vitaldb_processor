@@ -233,6 +233,7 @@ func processVitalFile(vf *vital.VitalFile, config *Config) *OutputData {
 
 // matchesAnyPattern checks if a name matches any of the provided glob patterns.
 // Returns true if patterns is empty (no filtering) or if name matches at least one pattern.
+// Supports wildcards (* and ?) that can match across path separators.
 func matchesAnyPattern(name string, patterns []string) bool {
 	// No patterns = no filtering, match everything
 	if len(patterns) == 0 {
@@ -241,17 +242,58 @@ func matchesAnyPattern(name string, patterns []string) bool {
 
 	// Check if name matches any pattern
 	for _, pattern := range patterns {
+		// First try filepath.Match for exact path matching
 		matched, err := filepath.Match(pattern, name)
-		if err != nil {
-			// Invalid pattern, skip it
-			continue
-		}
-		if matched {
+		if err == nil && matched {
 			return true
+		}
+
+		// Also try matching against just the base name (after last /)
+		// This allows patterns like "*_HR" to match "Bx50/ART1_HR"
+		baseName := filepath.Base(name)
+		matched, err = filepath.Match(pattern, baseName)
+		if err == nil && matched {
+			return true
+		}
+
+		// Try matching the pattern with simple string contains for wildcards
+		// This handles cases like "*_HR" matching "Bx50/ART1_HR"
+		if strings.Contains(pattern, "*") || strings.Contains(pattern, "?") {
+			// Convert glob pattern to regex-like matching
+			if matchGlobPattern(name, pattern) {
+				return true
+			}
 		}
 	}
 
 	return false
+}
+
+// matchGlobPattern performs simple glob matching that works across path separators
+func matchGlobPattern(str, pattern string) bool {
+	// Handle simple suffix patterns like "*_HR"
+	if strings.HasPrefix(pattern, "*") && !strings.Contains(pattern[1:], "*") {
+		suffix := pattern[1:]
+		return strings.HasSuffix(str, suffix)
+	}
+
+	// Handle simple prefix patterns like "ECG*"
+	if strings.HasSuffix(pattern, "*") && !strings.Contains(pattern[:len(pattern)-1], "*") {
+		prefix := pattern[:len(pattern)-1]
+		return strings.HasPrefix(str, prefix)
+	}
+
+	// Handle patterns with * in the middle
+	if strings.Contains(pattern, "*") {
+		parts := strings.Split(pattern, "*")
+		if len(parts) == 2 {
+			// Pattern like "Bx50/*_HR"
+			return strings.HasPrefix(str, parts[0]) && strings.HasSuffix(str, parts[1])
+		}
+	}
+
+	// Fall back to exact match
+	return str == pattern
 }
 
 func processTracks(vf *vital.VitalFile, config *Config) map[string]TrackInfo {
