@@ -1,0 +1,44 @@
+# golangci-lint configuration
+# https://golangci-lint.run/usage/configuration/
+
+run:
+  timeout: 5m
+  tests: true
+  build-tags:
+    - integration
+
+linters:
+  enable:
+    - govet         # Go vet examines Go source code
+    - errcheck      # Check for unchecked errors
+    - staticcheck   # Staticcheck is a go vet on steroids
+    - unused        # Checks for unused constants, variables, functions and types
+    - gosimple      # Linter for Go source code that specializes in simplifying code
+    - ineffassign   # Detects when assignments to existing variables are not used
+    - typecheck     # Like the front-end of a Go compiler, parses and type-checks Go code
+    - gofmt         # Gofmt checks whether code was gofmt-ed
+    - gocyclo       # Computes and checks the cyclomatic complexity of functions
+    - misspell      # Finds commonly misspelled English words in comments
+    - unconvert     # Remove unnecessary type conversions
+
+  disable-all: false
+
+linters-settings:
+  gocyclo:
+    # Minimal code complexity to report
+    min-complexity: 15
+
+  errcheck:
+    # Report about assignment of errors to blank identifier
+    check-blank: false
+    # Report about not checking errors in type assertions
+    check-type-assertions: false
+
+issues:
+  # Exclude some linters from running on test files
+  exclude-rules:
+    # Exclude some linters for test files
+    - path: _test\.go
+      linters:
+        - errcheck
+        - gocyclo

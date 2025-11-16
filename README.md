@@ -619,16 +619,65 @@ make bench
 
 # 테스트 파일 줄 수 검증
 make verify-linecount
+
+# 코드 커버리지 생성 (로컬)
+go test ./... -covermode=atomic -coverprofile=coverage.out
+go tool cover -html=coverage.out  # 브라우저에서 확인
 ```
 
 ### 테스트 파일 구조
 
-- `vital/unit_test.go` - 유닛 테스트 (Mock 데이터 사용, Task #2에서 구현 예정)
+- `vital/unit_test.go` - 유닛 테스트 (외부 파일 의존성 없음)
 - `vital/integration_test.go` - 통합 테스트 (`//go:build integration` 태그 필요)
 - `vital/benchmark_test.go` - 성능 벤치마크
 - `vital/helper_test.go` - 공통 테스트 헬퍼 함수
 
 통합 테스트는 `//go:build integration` 빌드 태그를 사용하여 실제 .vital 파일이 있을 때만 실행됩니다.
+
+### CI/CD 파이프라인
+
+이 프로젝트는 GitHub Actions를 통한 자동화된 CI/CD 파이프라인을 제공합니다:
+
+**자동 검사 항목**:
+- ✅ **Multi-OS 테스트**: Ubuntu, macOS, Windows에서 자동 빌드 및 테스트
+- ✅ **코드 품질**: golangci-lint를 통한 정적 분석
+- ✅ **코드 커버리지**: Codecov.io를 통한 커버리지 추적 및 시각화
+- ✅ **의존성 캐싱**: Go 모듈 및 빌드 캐시 자동 관리
+
+**CI 워크플로우** (`.github/workflows/ci.yml`):
+```yaml
+# 모든 푸시 및 PR에서 자동 실행:
+- Test (ubuntu-latest, macos-latest, windows-latest)
+- Lint (golangci-lint)
+- Coverage (Codecov 업로드)
+```
+
+**필요한 설정**:
+
+오픈소스로 공개 시, [Codecov](https://codecov.io)에서 토큰을 발급받고 GitHub 저장소의 Secrets에 추가:
+1. https://codecov.io에 접속하여 GitHub 계정으로 로그인
+2. 저장소 추가 및 `CODECOV_TOKEN` 발급
+3. GitHub 저장소 Settings → Secrets and variables → Actions
+4. `CODECOV_TOKEN` 시크릿 추가
+
+**로컬에서 CI와 동일하게 검증**:
+```bash
+# 모든 OS에서 실행되는 테스트 로컬 실행
+go test ./vital -v
+go test -tags=integration ./vital -v
+
+# 린트 실행 (golangci-lint 설치 필요)
+golangci-lint run --timeout=5m
+
+# 커버리지 생성
+go test ./... -covermode=atomic -coverprofile=coverage.out
+```
+
+**배지 추가** (README 상단):
+```markdown
+![CI](https://github.com/mdsung/vitaldb_processor/workflows/CI/badge.svg)
+![Coverage](https://codecov.io/gh/mdsung/vitaldb_processor/badge.svg)
+```
 
 ## 프로젝트 목표 및 설계 원칙
 
