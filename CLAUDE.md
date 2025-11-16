@@ -19,11 +19,11 @@ VitalDB Processor is a Go library that reads and processes VitalDB files (.vital
 
 ```bash
 # Build the CLI tool
-cd example
-go build -o vitaldb_processor main.go
+cd cmd/vitaldb
+go build -o vitaldb main.go
 
 # Run the built binary
-./vitaldb_processor [options] <vital_file_path>
+./vitaldb [options] <vital_file_path>
 ```
 
 ### Testing
@@ -48,25 +48,25 @@ go test -bench=. ./vital
 
 ```bash
 # CSV output (default, pandas-compatible)
-./vitaldb_processor ../data_sample/MICUA01_240724_180000.vital > output.csv
+./vitaldb ../data_sample/MICUA01_240724_180000.vital > output.csv
 
 # Parquet output (high-performance, compressed)
-./vitaldb_processor -format parquet ../data_sample/MICUA01_240724_180000.vital > output.parquet
+./vitaldb -format parquet ../data_sample/MICUA01_240724_180000.vital > output.parquet
 
 # Basic file info
-./vitaldb_processor -info-only -quiet ../data_sample/MICUA01_240724_180000.vital
+./vitaldb -info-only -quiet ../data_sample/MICUA01_240724_180000.vital
 
 # JSON output (for Python integration)
-./vitaldb_processor -format json -max-tracks 0 ../data_sample/MICUA01_240724_180000.vital
+./vitaldb -format json -max-tracks 0 ../data_sample/MICUA01_240724_180000.vital
 
 # Filter specific tracks
-./vitaldb_processor -tracks "ECG_II,HR,PLETH" ../data_sample/MICUA01_240724_180000.vital
+./vitaldb -tracks "ECG_II,HR,PLETH" ../data_sample/MICUA01_240724_180000.vital
 
 # Filter by track type
-./vitaldb_processor -track-type WAVE ../data_sample/MICUA01_240724_180000.vital
+./vitaldb -track-type WAVE ../data_sample/MICUA01_240724_180000.vital
 
 # Time range extraction
-./vitaldb_processor -start-time 0 -end-time 300 ../data_sample/MICUA01_240724_180000.vital
+./vitaldb -start-time 0 -end-time 300 ../data_sample/MICUA01_240724_180000.vital
 ```
 
 ## Architecture
@@ -84,8 +84,11 @@ vitaldb_processor/
 │   ├── rec.go               # Record data parsing (packet type 1)
 │   ├── cmd.go               # Command parsing (packet type 6)
 │   └── util.go              # Helper functions
-└── example/
-    └── main.go              # CLI tool with extensive options
+└── cmd/
+    └── vitaldb/             # CLI tool (Go standard practice)
+        ├── main.go          # CLI with extensive options
+        ├── main_test.go     # CLI tests
+        └── demo.py          # Python demo script
 ```
 
 ### Core Data Flow
@@ -152,7 +155,7 @@ Data is parsed on-demand:
 - `MaxTracks` and `MaxSamples` options control output size
 - Only requested data is included in output
 
-### CLI Architecture (`example/main.go`)
+### CLI Architecture (`cmd/vitaldb/main.go`)
 
 The CLI tool separates concerns:
 - `parseFlags()`: Command-line argument parsing
@@ -166,8 +169,8 @@ The CLI tool separates concerns:
 
 1. Update core types in `vital/types.go` if needed
 2. Implement parsing logic in appropriate parser file
-3. Update CLI in `example/main.go` if exposing to users
-4. Add tests in `vital/vital_test.go`
+3. Update CLI in `cmd/vitaldb/main.go` if exposing to users
+4. Add tests in `vital/*_test.go`
 
 ### Testing Strategy (From TODO.md)
 
@@ -224,8 +227,8 @@ Some VitalDB files have incomplete packets at EOF. The library matches Python Vi
 go test -tags=integration ./vital -v
 
 # Test CLI with sample data
-cd example
-./vitaldb_processor ../data_sample/MICUA01_240724_180000.vital
+cd cmd/vitaldb
+./vitaldb ../data_sample/MICUA01_240724_180000.vital
 ```
 
 **Note**: Integration tests (`integration_test.go`) may reference paths like `../../data_sample/`. Use these real files for testing instead of mocks when possible.
@@ -245,7 +248,7 @@ import subprocess
 import json
 
 def load_vital_data(file_path, **kwargs):
-    cmd = ['./vitaldb_processor', '-format', 'json']
+    cmd = ['./vitaldb', '-format', 'json']
     if 'tracks' in kwargs:
         cmd.extend(['-tracks', ','.join(kwargs['tracks'])])
     cmd.append(file_path)

@@ -190,7 +190,7 @@ import pandas as pd
 
 def load_vital_csv(file_path, **kwargs):
     """VitalDB 파일을 CSV로 변환 후 pandas DataFrame으로 로드"""
-    cmd = ['./vitaldb_processor', '-format', 'csv']
+    cmd = ['./vitaldb', '-format', 'csv']
 
     # 옵션 추가
     if 'tracks' in kwargs:
@@ -236,7 +236,7 @@ import pandas as pd
 
 def load_vital_parquet(file_path, **kwargs):
     """VitalDB 파일을 Parquet로 변환 후 pandas DataFrame으로 로드"""
-    cmd = ['./vitaldb_processor', '-format', 'parquet']
+    cmd = ['./vitaldb', '-format', 'parquet']
 
     # 옵션 추가 (CSV와 동일)
     if 'tracks' in kwargs:
@@ -273,7 +273,7 @@ import json
 
 def load_vital_data_json(file_path, **kwargs):
     """VitalDB 파일을 JSON으로 로드 (4.37배 빠름)"""
-    cmd = ['./vitaldb_processor', '-format', 'json', '-compact']
+    cmd = ['./vitaldb', '-format', 'json', '-compact']
 
     # 옵션 추가
     if 'tracks' in kwargs:
@@ -304,7 +304,7 @@ import msgpack  # pip install msgpack
 
 def load_vital_data_msgpack(file_path, **kwargs):
     """VitalDB 파일을 MessagePack으로 로드 (7.29배 빠름, 30% 작은 크기)"""
-    cmd = ['./vitaldb_processor', '-format', 'msgpack']
+    cmd = ['./vitaldb', '-format', 'msgpack']
 
     # 옵션 추가 (JSON과 동일)
     if 'tracks' in kwargs:
@@ -391,13 +391,13 @@ surgery_data = load_vital_data('data.vital',
 ```python
 def get_file_info(file_path):
     """파일 정보만 빠르게 확인"""
-    cmd = ['./vitaldb_processor', '-info-only', '-format', 'json', '-quiet', file_path]
+    cmd = ['./vitaldb', '-info-only', '-format', 'json', '-quiet', file_path]
     result = subprocess.run(cmd, capture_output=True, text=True)
     return json.loads(result.stdout)
 
 def list_available_tracks(file_path):
     """사용 가능한 트랙 목록 확인"""
-    cmd = ['./vitaldb_processor', '-list-tracks', '-format', 'json', '-quiet', file_path]
+    cmd = ['./vitaldb', '-list-tracks', '-format', 'json', '-quiet', file_path]
     result = subprocess.run(cmd, capture_output=True, text=True)
     return json.loads(result.stdout)
 
@@ -522,21 +522,21 @@ print(df.describe())
 ## 예제 실행
 
 ```bash
-# 개선된 바이너리 빌드
-cd example
-go build -o vitaldb_processor main.go
+# CLI 도구 빌드
+cd cmd/vitaldb
+go build -o vitaldb main.go
 
 # 기본 사용법
-./vitaldb_processor /path/to/your/file.vital
+./vitaldb /path/to/your/file.vital
 
 # JSON 형태로 모든 트랙 출력
-./vitaldb_processor -format json -max-tracks 0 /path/to/your/file.vital
+./vitaldb -format json -max-tracks 0 /path/to/your/file.vital
 
 # 특정 트랙만 확인
-./vitaldb_processor -tracks "ECG_II,HR" /path/to/your/file.vital
+./vitaldb -tracks "ECG_II,HR" /path/to/your/file.vital
 
 # 파일 정보만 빠르게 확인
-./vitaldb_processor -info-only -quiet /path/to/your/file.vital
+./vitaldb -info-only -quiet /path/to/your/file.vital
 
 # 새로운 기능들 데모 (VitalDB 파일 없이도 가능)
 python3 demo.py
@@ -549,7 +549,14 @@ python3 demo.py
 ### 기본 사용법
 
 ```bash
-./vitaldb_processor [options] <vital_file_path>
+./vitaldb [options] <vital_file_path>
+```
+
+### CLI 도구 빌드
+
+```bash
+cd cmd/vitaldb
+go build -o vitaldb main.go
 ```
 
 ### 사용 가능한 옵션
@@ -589,99 +596,99 @@ python3 demo.py
 
 ```bash
 # CSV 형태로 출력 (기본값, pandas 호환)
-./vitaldb_processor data.vital > output.csv
-./vitaldb_processor -format csv data.vital > output.csv
+./vitaldb data.vital > output.csv
+./vitaldb -format csv data.vital > output.csv
 
 # Parquet 형태로 출력 (압축 효율적, 고성능)
-./vitaldb_processor -format parquet data.vital > output.parquet
+./vitaldb -format parquet data.vital > output.parquet
 
 # MessagePack 형태로 출력 (최고 성능, 7.29배 빠름)
-./vitaldb_processor -format msgpack data.vital > output.msgpack
+./vitaldb -format msgpack data.vital > output.msgpack
 
 # JSON Compact 형태로 출력 (4.37배 빠름)
-./vitaldb_processor -format json -compact data.vital > output.json
+./vitaldb -format json -compact data.vital > output.json
 
 # JSON 형태로 출력 (가독성 우선, Pretty-print)
-./vitaldb_processor -format json data.vital
+./vitaldb -format json data.vital
 
 # 텍스트 형태로 출력
-./vitaldb_processor -format text data.vital
+./vitaldb -format text data.vital
 
 # 요약 정보만 출력
-./vitaldb_processor -summary data.vital
+./vitaldb -summary data.vital
 ```
 
 ### 트랙 필터링 옵션
 
 ```bash
 # 특정 트랙들만 추출
-./vitaldb_processor -tracks "ECG_II,HR,PLETH" data.vital
+./vitaldb -tracks "ECG_II,HR,PLETH" data.vital
 
 # 트랙 타입별 필터링
-./vitaldb_processor -track-type WAVE data.vital
-./vitaldb_processor -track-type NUMERIC data.vital
-./vitaldb_processor -track-type STRING data.vital
+./vitaldb -track-type WAVE data.vital
+./vitaldb -track-type NUMERIC data.vital
+./vitaldb -track-type STRING data.vital
 
 # 모든 트랙 출력 (제한 없음)
-./vitaldb_processor -max-tracks 0 data.vital
+./vitaldb -max-tracks 0 data.vital
 
 # 처음 5개 트랙만 출력
-./vitaldb_processor -max-tracks 5 data.vital
+./vitaldb -max-tracks 5 data.vital
 ```
 
 ### 시간 범위 옵션
 
 ```bash
 # 특정 시간 범위 추출 (초 단위)
-./vitaldb_processor -start-time 0 -end-time 300 data.vital
+./vitaldb -start-time 0 -end-time 300 data.vital
 
 # 처음 5분간의 데이터
-./vitaldb_processor -start-time 0 -end-time 300 data.vital
+./vitaldb -start-time 0 -end-time 300 data.vital
 ```
 
 ### 정보 조회 옵션
 
 ```bash
 # 트랙 목록만 출력
-./vitaldb_processor -list-tracks data.vital
+./vitaldb -list-tracks data.vital
 
 # 파일 정보만 출력
-./vitaldb_processor -info-only data.vital
+./vitaldb -info-only data.vital
 
 # 디바이스 정보만 출력
-./vitaldb_processor -list-devices data.vital
+./vitaldb -list-devices data.vital
 ```
 
 ### 출력 제어 옵션
 
 ```bash
 # 샘플 개수 제한
-./vitaldb_processor -max-samples 10 data.vital
+./vitaldb -max-samples 10 data.vital
 
 # 조용한 모드 (에러만 출력)
-./vitaldb_processor -quiet data.vital
+./vitaldb -quiet data.vital
 
 # 상세 모드 (샘플 데이터까지 표시)
-./vitaldb_processor -verbose data.vital
+./vitaldb -verbose data.vital
 ```
 
 ### 사용 예시
 
 ```bash
 # ECG 데이터만 처음 5분간 MessagePack으로 추출 (최고 성능)
-./vitaldb_processor -tracks "ECG_II" -start-time 0 -end-time 300 -format msgpack data.vital > ecg.msgpack
+./vitaldb -tracks "ECG_II" -start-time 0 -end-time 300 -format msgpack data.vital > ecg.msgpack
 
 # 모든 수치형 데이터를 JSON Compact로 저장
-./vitaldb_processor -track-type NUMERIC -format json -compact data.vital > vitals.json
+./vitaldb -track-type NUMERIC -format json -compact data.vital > vitals.json
 
 # 파일 정보 빠르게 확인
-./vitaldb_processor -info-only -quiet data.vital
+./vitaldb -info-only -quiet data.vital
 
 # 모든 트랙을 MessagePack으로 출력 (Python 연동용, 최고 성능)
-./vitaldb_processor -format msgpack -max-tracks 0 -max-samples 0 data.vital > output.msgpack
+./vitaldb -format msgpack -max-tracks 0 -max-samples 0 data.vital > output.msgpack
 
 # 모든 트랙을 JSON Compact으로 출력 (Python 연동용, 범용)
-./vitaldb_processor -format json -compact -max-tracks 0 -max-samples 0 data.vital > output.json
+./vitaldb -format json -compact -max-tracks 0 -max-samples 0 data.vital > output.json
 ```
 
 ## 테스트
@@ -804,7 +811,7 @@ vf = vitaldb.VitalFile('data.vital')
 "
 
 # 2. Go로 동일한 파일 처리
-./vitaldb_processor -format json data.vital > go_output.json
+./vitaldb -format json data.vital > go_output.json
 
 # 3. 결과 비교 - 동일해야 함!
 ```
@@ -825,11 +832,11 @@ vf = vitaldb.VitalFile('data.vital')
 **하이브리드 접근** (최적):
 ```bash
 # 방법 1: MessagePack 사용 (최고 성능, 7.29배 빠름)
-./vitaldb_processor -format msgpack -max-tracks 0 data.vital > output.msgpack
+./vitaldb -format msgpack -max-tracks 0 data.vital > output.msgpack
 python analyze.py output.msgpack  # msgpack.unpackb() 사용
 
 # 방법 2: JSON Compact 사용 (범용, 4.37배 빠름)
-./vitaldb_processor -format json -compact -max-tracks 0 data.vital > output.json
+./vitaldb -format json -compact -max-tracks 0 data.vital > output.json
 python analyze.py output.json  # json.loads() 사용
 ```
 

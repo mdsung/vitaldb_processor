@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"runtime/pprof"
 	"strings"
 
@@ -17,22 +18,23 @@ import (
 )
 
 type Config struct {
-	Format      string  // "csv", "parquet", "text", "json", or "msgpack"
-	Compact     bool    // Compact JSON (no indentation)
-	ListTracks  bool    // 트랙 목록만 출력
-	InfoOnly    bool    // 파일 정보만 출력
-	ListDevices bool    // 디바이스 목록만 출력
-	Summary     bool    // 요약 정보만 출력
-	Tracks      string  // 특정 트랙들만 출력 (쉼표로 구분)
-	TrackType   string  // 트랙 타입 필터 ("WAVE", "NUMERIC", "STRING")
-	MaxTracks   int     // 최대 트랙 개수 제한 (0 = 무제한)
-	MaxSamples  int     // 샘플 데이터 최대 개수
-	StartTime   float64 // 시작 시간
-	EndTime     float64 // 종료 시간
-	Quiet       bool    // 조용한 모드
-	Verbose     bool    // 상세 모드
-	CPUProfile  string  // CPU 프로파일 출력 파일
-	MemProfile  string  // 메모리 프로파일 출력 파일
+	Format       string  // "csv", "parquet", "text", "json", or "msgpack"
+	Compact      bool    // Compact JSON (no indentation)
+	ListTracks   bool    // 트랙 목록만 출력
+	InfoOnly     bool    // 파일 정보만 출력
+	ListDevices  bool    // 디바이스 목록만 출력
+	Summary      bool    // 요약 정보만 출력
+	Tracks       string  // 특정 트랙들만 출력 (쉼표로 구분)
+	TrackPattern string  // 트랙 이름 패턴 필터 (glob 스타일: *, ?)
+	TrackType    string  // 트랙 타입 필터 ("WAVE", "NUMERIC", "STRING")
+	MaxTracks    int     // 최대 트랙 개수 제한 (0 = 무제한)
+	MaxSamples   int     // 샘플 데이터 최대 개수
+	StartTime    float64 // 시작 시간
+	EndTime      float64 // 종료 시간
+	Quiet        bool    // 조용한 모드
+	Verbose      bool    // 상세 모드
+	CPUProfile   string  // CPU 프로파일 출력 파일
+	MemProfile   string  // 메모리 프로파일 출력 파일
 }
 
 type OutputData struct {
@@ -179,6 +181,7 @@ func parseFlags() *Config {
 	flag.BoolVar(&config.ListDevices, "list-devices", false, "디바이스 목록만 출력")
 	flag.BoolVar(&config.Summary, "summary", false, "요약 정보만 출력")
 	flag.StringVar(&config.Tracks, "tracks", "", "특정 트랙들만 출력 (쉼표로 구분)")
+	flag.StringVar(&config.TrackPattern, "track-pattern", "", "트랙 이름 패턴 필터 (glob 스타일: ECG*, *_II, 쉼표로 구분)")
 	flag.StringVar(&config.TrackType, "track-type", "", "트랙 타입 필터 (WAVE, NUMERIC, STRING)")
 	flag.IntVar(&config.MaxTracks, "max-tracks", 0, "최대 트랙 개수 제한 (0 = 무제한)")
 	flag.IntVar(&config.MaxSamples, "max-samples", 3, "샘플 데이터 최대 개수")
@@ -228,6 +231,29 @@ func processVitalFile(vf *vital.VitalFile, config *Config) *OutputData {
 	return output
 }
 
+// matchesAnyPattern checks if a name matches any of the provided glob patterns.
+// Returns true if patterns is empty (no filtering) or if name matches at least one pattern.
+func matchesAnyPattern(name string, patterns []string) bool {
+	// No patterns = no filtering, match everything
+	if len(patterns) == 0 {
+		return true
+	}
+
+	// Check if name matches any pattern
+	for _, pattern := range patterns {
+		matched, err := filepath.Match(pattern, name)
+		if err != nil {
+			// Invalid pattern, skip it
+			continue
+		}
+		if matched {
+			return true
+		}
+	}
+
+	return false
+}
+
 func processTracks(vf *vital.VitalFile, config *Config) map[string]TrackInfo {
 	tracks := make(map[string]TrackInfo)
 
@@ -237,6 +263,15 @@ func processTracks(vf *vital.VitalFile, config *Config) map[string]TrackInfo {
 		selectedTracks = strings.Split(config.Tracks, ",")
 		for i := range selectedTracks {
 			selectedTracks[i] = strings.TrimSpace(selectedTracks[i])
+		}
+	}
+
+	// 패턴 필터링
+	trackPatterns := make([]string, 0)
+	if config.TrackPattern != "" {
+		trackPatterns = strings.Split(config.TrackPattern, ",")
+		for i := range trackPatterns {
+			trackPatterns[i] = strings.TrimSpace(trackPatterns[i])
 		}
 	}
 
@@ -259,6 +294,11 @@ func processTracks(vf *vital.VitalFile, config *Config) map[string]TrackInfo {
 			if !found {
 				continue
 			}
+		}
+
+		// 패턴 필터링
+		if !matchesAnyPattern(name, trackPatterns) {
+			continue
 		}
 
 		// 트랙 타입 필터링
