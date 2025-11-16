@@ -1,0 +1,94 @@
+{
+	"mcpServers": {
+		"Context7": {
+			"type": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"@upstash/context7-mcp"
+			]
+		},
+		"sequential-thinking": {
+			"type": "stdio",
+			"command": "node",
+			"args": [
+				"/Users/YOUR_USERNAME/mcps/servers/src/sequentialthinking/dist/index.js"
+			]
+		},
+		"zotero": {
+			"type": "stdio",
+			"command": "uvx",
+			"args": [
+				"zotero-mcp"
+			],
+			"env": {
+				"ZOTERO_LOCAL": "true",
+				"ZOTERO_API_KEY": "YOUR_ZOTERO_API_KEY_HERE",
+				"ZOTERO_LIBRARY_ID": "YOUR_LIBRARY_ID_HERE"
+			}
+		},
+		"perplexity-mcp": {
+			"type": "stdio",
+			"command": "uvx",
+			"args": [
+				"perplexity-mcp"
+			],
+			"env": {
+				"PERPLEXITY_API_KEY": "YOUR_PERPLEXITY_API_KEY_HERE",
+				"PERPLEXITY_MODEL": "sonar"
+			}
+		},
+		"obsidian-mcp-server": {
+			"type": "stdio",
+			"command": "npx",
+			"args": [
+				"obsidian-mcp-server"
+			],
+			"env": {
+				"OBSIDIAN_API_KEY": "YOUR_OBSIDIAN_API_KEY_HERE",
+				"OBSIDIAN_BASE_URL": "YOUR_OBSIDIAN_BASE_URL_HERE",
+				"OBSIDIAN_VERIFY_SSL": "false",
+				"OBSIDIAN_ENABLE_CACHE": "true"
+			},
+			"disabled": false,
+			"autoApprove": []
+		},
+		"postgresql-mcp": {
+			"type": "stdio",
+			"command": "npx",
+			"args": [
+				"@henkey/postgres-mcp-server",
+				"--connection-string",
+				"postgresql://USERNAME:PASSWORD@HOST:PORT/DATABASE"
+			]
+		},
+		"gemini-cli": {
+			"type": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"gemini-mcp-tool"
+			],
+			"env": {}
+		},
+		"task-master-ai": {
+			"type": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"task-master-ai"
+			],
+			"env": {
+				"ANTHROPIC_API_KEY": "YOUR_ANTHROPIC_API_KEY_HERE",
+				"PERPLEXITY_API_KEY": "YOUR_PERPLEXITY_API_KEY_HERE",
+				"OPENAI_API_KEY": "YOUR_OPENAI_KEY_HERE",
+				"GOOGLE_API_KEY": "YOUR_GOOGLE_KEY_HERE",
+				"XAI_API_KEY": "YOUR_XAI_KEY_HERE",
+				"OPENROUTER_API_KEY": "YOUR_OPENROUTER_KEY_HERE",
+				"MISTRAL_API_KEY": "YOUR_MISTRAL_KEY_HERE",
+				"AZURE_OPENAI_API_KEY": "YOUR_AZURE_KEY_HERE",
+				"OLLAMA_API_KEY": "YOUR_OLLAMA_API_KEY_HERE"
+			}
+		}
+	}
+}

@@ -87,3 +87,4 @@ benchmark/*.prof
 .zed/
 .clinerules/
 opencode.json
+.mcp.json
