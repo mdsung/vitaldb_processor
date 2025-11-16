@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/csv"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -11,11 +12,12 @@ import (
 	"strings"
 
 	"github.com/mdsung/vitaldb_processor/vital"
+	"github.com/parquet-go/parquet-go"
 	"github.com/vmihailenco/msgpack/v5"
 )
 
 type Config struct {
-	Format      string  // "text", "json", or "msgpack"
+	Format      string  // "csv", "parquet", "text", "json", or "msgpack"
 	Compact     bool    // Compact JSON (no indentation)
 	ListTracks  bool    // 트랙 목록만 출력
 	InfoOnly    bool    // 파일 정보만 출력
@@ -77,6 +79,14 @@ type RecordInfo struct {
 	Value interface{} `json:"val"`
 }
 
+// ParquetRow represents a single row in Parquet output
+type ParquetRow struct {
+	TrackName string  `parquet:"track_name,snappy"`
+	Timestamp float64 `parquet:"timestamp,snappy"`
+	Value     string  `parquet:"value,snappy"`
+	Unit      string  `parquet:"unit,snappy"`
+}
+
 func main() {
 	config := parseFlags()
 
@@ -114,6 +124,14 @@ func main() {
 
 	// 출력 형식에 따라 처리
 	switch config.Format {
+	case "csv":
+		if err := printCSVOutput(output, config); err != nil {
+			log.Fatal(err)
+		}
+	case "parquet":
+		if err := printParquetOutput(output, config); err != nil {
+			log.Fatal(err)
+		}
 	case "json":
 		encoder := json.NewEncoder(os.Stdout)
 		if !config.Compact {
@@ -132,8 +150,10 @@ func main() {
 		if err := writer.Flush(); err != nil {
 			log.Fatal(err)
 		}
-	default: // "text"
+	case "text":
 		printTextOutput(output, config)
+	default:
+		log.Fatalf("Unknown format: %s. Supported formats: csv, parquet, text, json, msgpack", config.Format)
 	}
 
 	// 메모리 프로파일링
@@ -152,7 +172,7 @@ func main() {
 func parseFlags() *Config {
 	config := &Config{}
 
-	flag.StringVar(&config.Format, "format", "text", "출력 형식 (text, json, msgpack)")
+	flag.StringVar(&config.Format, "format", "csv", "출력 형식 (csv, parquet, text, json, msgpack)")
 	flag.BoolVar(&config.Compact, "compact", false, "Compact JSON (들여쓰기 없음)")
 	flag.BoolVar(&config.ListTracks, "list-tracks", false, "트랙 목록만 출력")
 	flag.BoolVar(&config.InfoOnly, "info-only", false, "파일 정보만 출력")
@@ -325,6 +345,80 @@ func getTypeName(trackType uint8) string {
 	default:
 		return "UNKNOWN"
 	}
+}
+
+func printParquetOutput(output *OutputData, config *Config) error {
+	// Collect all rows first
+	var rows []ParquetRow
+
+	if output.Tracks != nil {
+		for trackName, track := range output.Tracks {
+			for _, record := range track.Records {
+				// Convert value to string
+				valueStr := fmt.Sprintf("%v", record.Value)
+
+				rows = append(rows, ParquetRow{
+					TrackName: trackName,
+					Timestamp: record.Time,
+					Value:     valueStr,
+					Unit:      track.Unit,
+				})
+			}
+		}
+	}
+
+	// Create Parquet writer with buffering
+	writer := bufio.NewWriterSize(os.Stdout, 256*1024) // 256KB buffer
+	defer writer.Flush()
+
+	parquetWriter := parquet.NewGenericWriter[ParquetRow](writer)
+	defer parquetWriter.Close()
+
+	// Write all rows at once for better performance
+	if _, err := parquetWriter.Write(rows); err != nil {
+		return fmt.Errorf("failed to write Parquet data: %w", err)
+	}
+
+	return nil
+}
+
+func printCSVOutput(output *OutputData, config *Config) error {
+	// CSV writer with buffering for performance
+	writer := bufio.NewWriterSize(os.Stdout, 256*1024) // 256KB buffer
+	csvWriter := csv.NewWriter(writer)
+	defer func() {
+		csvWriter.Flush()
+		writer.Flush()
+	}()
+
+	// Write header
+	header := []string{"track_name", "timestamp", "value", "unit"}
+	if err := csvWriter.Write(header); err != nil {
+		return fmt.Errorf("failed to write CSV header: %w", err)
+	}
+
+	// Write data rows
+	if output.Tracks != nil {
+		for trackName, track := range output.Tracks {
+			for _, record := range track.Records {
+				// Convert value to string
+				valueStr := fmt.Sprintf("%v", record.Value)
+
+				row := []string{
+					trackName,
+					fmt.Sprintf("%.6f", record.Time),
+					valueStr,
+					track.Unit,
+				}
+
+				if err := csvWriter.Write(row); err != nil {
+					return fmt.Errorf("failed to write CSV row: %w", err)
+				}
+			}
+		}
+	}
+
+	return nil
 }
 
 func printTextOutput(output *OutputData, config *Config) {

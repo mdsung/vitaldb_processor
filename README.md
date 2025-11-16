@@ -180,7 +180,90 @@ vf = vitaldb.VitalFile('data.vital')
 
 **주의**: 이 설정 없이 Python VitalDB를 사용하면 일부 파일에서 "buffer is too small" 오류가 발생할 수 있습니다. Go VitalDB Processor는 이러한 문제가 없습니다.
 
-### 1. 데이터 로드 (JSON / MessagePack)
+### 1. CSV/Parquet를 통한 데이터 로드 (권장)
+
+#### 방법 A: CSV (범용, pandas 호환)
+
+```python
+import subprocess
+import pandas as pd
+
+def load_vital_csv(file_path, **kwargs):
+    """VitalDB 파일을 CSV로 변환 후 pandas DataFrame으로 로드"""
+    cmd = ['./vitaldb_processor', '-format', 'csv']
+
+    # 옵션 추가
+    if 'tracks' in kwargs:
+        cmd.extend(['-tracks', ','.join(kwargs['tracks'])])
+    if 'track_type' in kwargs:
+        cmd.extend(['-track-type', kwargs['track_type']])
+    if 'start_time' in kwargs:
+        cmd.extend(['-start-time', str(kwargs['start_time'])])
+    if 'end_time' in kwargs:
+        cmd.extend(['-end-time', str(kwargs['end_time'])])
+    if 'max_samples' in kwargs:
+        cmd.extend(['-max-samples', str(kwargs['max_samples'])])
+
+    cmd.append(file_path)
+
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise Exception(f"Error processing file: {result.stderr}")
+
+    # CSV를 pandas DataFrame으로 직접 로드
+    from io import StringIO
+    return pd.read_csv(StringIO(result.stdout))
+
+# 사용 예시
+df = load_vital_csv('data.vital')
+print(df.head())
+
+# 특정 트랙만 로드
+ecg_df = load_vital_csv('data.vital', tracks=['ECG_II', 'HR'])
+
+# 시간 범위 지정
+df_5min = load_vital_csv('data.vital', start_time=0, end_time=300)
+
+# pandas로 분석
+print(df.groupby('track_name')['value'].describe())
+```
+
+#### 방법 B: Parquet (고성능, 압축 효율적)
+
+```python
+import subprocess
+import pandas as pd
+
+def load_vital_parquet(file_path, **kwargs):
+    """VitalDB 파일을 Parquet로 변환 후 pandas DataFrame으로 로드"""
+    cmd = ['./vitaldb_processor', '-format', 'parquet']
+
+    # 옵션 추가 (CSV와 동일)
+    if 'tracks' in kwargs:
+        cmd.extend(['-tracks', ','.join(kwargs['tracks'])])
+    if 'track_type' in kwargs:
+        cmd.extend(['-track-type', kwargs['track_type']])
+    if 'start_time' in kwargs:
+        cmd.extend(['-start-time', str(kwargs['start_time'])])
+    if 'end_time' in kwargs:
+        cmd.extend(['-end-time', str(kwargs['end_time'])])
+
+    cmd.append(file_path)
+
+    result = subprocess.run(cmd, capture_output=True)
+    if result.returncode != 0:
+        raise Exception(f"Error processing file: {result.stderr}")
+
+    # Parquet를 pandas DataFrame으로 직접 로드
+    from io import BytesIO
+    return pd.read_parquet(BytesIO(result.stdout))
+
+# 사용 예시 (CSV보다 약 30% 빠름)
+df = load_vital_parquet('data.vital')
+print(df.head())
+```
+
+### 2. 데이터 로드 (JSON / MessagePack)
 
 #### 방법 A: JSON (범용, 디버깅 용이)
 
@@ -473,7 +556,7 @@ python3 demo.py
 
 ```
 -format string
-    출력 형식 (text, json, msgpack) (기본값: "text")
+    출력 형식 (csv, parquet, text, json, msgpack) (기본값: "csv")
 -compact
     Compact JSON 출력 (들여쓰기 없음, 성능 향상)
 -info-only
@@ -505,6 +588,13 @@ python3 demo.py
 ### 출력 형식 옵션
 
 ```bash
+# CSV 형태로 출력 (기본값, pandas 호환)
+./vitaldb_processor data.vital > output.csv
+./vitaldb_processor -format csv data.vital > output.csv
+
+# Parquet 형태로 출력 (압축 효율적, 고성능)
+./vitaldb_processor -format parquet data.vital > output.parquet
+
 # MessagePack 형태로 출력 (최고 성능, 7.29배 빠름)
 ./vitaldb_processor -format msgpack data.vital > output.msgpack
 
@@ -514,8 +604,8 @@ python3 demo.py
 # JSON 형태로 출력 (가독성 우선, Pretty-print)
 ./vitaldb_processor -format json data.vital
 
-# 기본 텍스트 형태로 출력
-./vitaldb_processor data.vital
+# 텍스트 형태로 출력
+./vitaldb_processor -format text data.vital
 
 # 요약 정보만 출력
 ./vitaldb_processor -summary data.vital
