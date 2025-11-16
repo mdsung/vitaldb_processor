@@ -33,15 +33,19 @@ go.work
 ehthumbs.db
 Thumbs.db
 
-# Example files
+# Example files (legacy)
 example/example
 example/*.vital
+example/vitaldb_processor
+
+# CLI binaries
+cmd/vitaldb/vitaldb
+cmd/*/vitaldb
 
 # Test files
 *.vital
-testdata/*.vital 
+testdata/*.vital
 **/test_binary
-example/vitaldb_processor
 
 # Logs
 logs
