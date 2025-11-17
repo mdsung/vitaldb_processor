@@ -65,7 +65,7 @@ func parseTrkInfo(pkt []byte, vf *VitalFile) {
 	vf.TrkIDs[tid] = fullTrackName
 
 	trk := Track{
-		Name:    name,
+		Name:    fullTrackName, // Python VitalDB 호환성: "Device/TrackName" 형식
 		Type:    trktype,
 		Fmt:     fmtcode,
 		Unit:    unit,

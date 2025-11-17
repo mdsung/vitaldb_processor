@@ -123,35 +123,76 @@ func parseWaveData(pkt []byte, pos int, dt float64, trkid uint16, track *Track, 
 		}
 		samples = float64Samples
 
-	default: // 정수 타입들 - gain/offset 적용 후 float32로 저장 (메모리 효율성)
-		float32Samples := make([]float32, nsamples)
+	case 5: // int16 - Python VitalDB와 호환성을 위해 원본 타입 유지
+		int16Samples := make([]int16, nsamples)
 		for i := 0; i < int(nsamples); i++ {
 			samplePos := pos + i*sampleSize
 			if samplePos+sampleSize > len(pkt) {
 				break
 			}
-
-			var rawValue float32
-			switch track.Fmt {
-			case 3: // int8
-				rawValue = float32(int8(pkt[samplePos]))
-			case 4: // uint8
-				rawValue = float32(pkt[samplePos])
-			case 5: // int16
-				rawValue = float32(int16(binary.LittleEndian.Uint16(pkt[samplePos : samplePos+2])))
-			case 6: // uint16
-				rawValue = float32(binary.LittleEndian.Uint16(pkt[samplePos : samplePos+2]))
-			case 7: // int32
-				rawValue = float32(int32(binary.LittleEndian.Uint32(pkt[samplePos : samplePos+4])))
-			case 8: // uint32
-				rawValue = float32(binary.LittleEndian.Uint32(pkt[samplePos : samplePos+4]))
-			}
-
-			// gain/offset 적용
-			sample := rawValue*float32(track.Gain) + float32(track.Offset)
-			float32Samples[i] = sample
+			int16Samples[i] = int16(binary.LittleEndian.Uint16(pkt[samplePos : samplePos+2]))
 		}
-		samples = float32Samples
+		samples = int16Samples
+
+	default: // 기타 정수 타입들 - Python VitalDB 호환성을 위해 원본 타입 유지
+		// Python VitalDB는 gain/offset을 적용하지 않고 raw 값을 저장함
+		// 사용자가 필요시 track.Gain과 track.Offset을 사용하여 변환 가능
+		switch track.Fmt {
+		case 3: // int8
+			int8Samples := make([]int8, nsamples)
+			for i := 0; i < int(nsamples); i++ {
+				samplePos := pos + i*sampleSize
+				if samplePos+sampleSize > len(pkt) {
+					break
+				}
+				int8Samples[i] = int8(pkt[samplePos])
+			}
+			samples = int8Samples
+
+		case 4: // uint8
+			uint8Samples := make([]uint8, nsamples)
+			for i := 0; i < int(nsamples); i++ {
+				samplePos := pos + i*sampleSize
+				if samplePos+sampleSize > len(pkt) {
+					break
+				}
+				uint8Samples[i] = pkt[samplePos]
+			}
+			samples = uint8Samples
+
+		case 6: // uint16
+			uint16Samples := make([]uint16, nsamples)
+			for i := 0; i < int(nsamples); i++ {
+				samplePos := pos + i*sampleSize
+				if samplePos+sampleSize > len(pkt) {
+					break
+				}
+				uint16Samples[i] = binary.LittleEndian.Uint16(pkt[samplePos : samplePos+2])
+			}
+			samples = uint16Samples
+
+		case 7: // int32
+			int32Samples := make([]int32, nsamples)
+			for i := 0; i < int(nsamples); i++ {
+				samplePos := pos + i*sampleSize
+				if samplePos+sampleSize > len(pkt) {
+					break
+				}
+				int32Samples[i] = int32(binary.LittleEndian.Uint32(pkt[samplePos : samplePos+4]))
+			}
+			samples = int32Samples
+
+		case 8: // uint32
+			uint32Samples := make([]uint32, nsamples)
+			for i := 0; i < int(nsamples); i++ {
+				samplePos := pos + i*sampleSize
+				if samplePos+sampleSize > len(pkt) {
+					break
+				}
+				uint32Samples[i] = binary.LittleEndian.Uint32(pkt[samplePos : samplePos+4])
+			}
+			samples = uint32Samples
+		}
 	}
 
 	track.Recs = append(track.Recs, Rec{Dt: dt, Val: samples})
